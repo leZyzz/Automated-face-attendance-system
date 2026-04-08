@@ -47,7 +47,7 @@ class AiWorker(QObject) :
     def cos_sim(self,a,b):
             return np.dot(a,b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
-    def recognize_face(self,emb, database, threshold=0.7):
+    def recognize_face(self,emb, database, threshold=0.8):
         """
         Compares the query embedding (emb) against all stored embeddings 
         in the database using vectorized NumPy operations.
@@ -170,7 +170,7 @@ class AiWorker(QObject) :
                     emb = embedder.get_embedding(face_crop)
 
                     if emb is not None : 
-                        name = self.recognize_face(emb, self.db, threshold=0.6)
+                        name = self.recognize_face(emb, self.db, threshold=0.8)
                     else : name = "unknown"
                     color = (0,255,0) if name != "unknown" else (0,0,255)
                     cv2.rectangle(frame, (x1,y1), (x2,y2), color, 2)
