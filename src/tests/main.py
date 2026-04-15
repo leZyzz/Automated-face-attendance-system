@@ -4,13 +4,12 @@ import torch
 import cv2 
 import numpy as np
 
-# detect the device being used
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-## face detection model 
 
-yolo = YOLO("yolov8nbest.pt")
+yolo = YOLO("/home/zyzz/py/myenv/assets/models/yolov8nbest.pt")
 
 
 # embedding generator model 

@@ -18,6 +18,8 @@ class AiWorker(QObject) :
     def __init__(self,db) : 
         
         super().__init__()
+        self.yolo = YoloOnnx()
+        self.embedder = FaceNetEmbedderOnnx()
         self.db = db
         self.active = True
         self.mode = 0 #attendance 
@@ -107,8 +109,7 @@ class AiWorker(QObject) :
         return Qformat_img.copy()
     @Slot()
     def start_camera_loop(self):
-        yolo = YoloOnnx()
-        embedder = FaceNetEmbedderOnnx()
+      
         cap = cv2.VideoCapture(0)
     
         while self.active:
@@ -118,7 +119,7 @@ class AiWorker(QObject) :
                 self.status_update.emit("Failed to get frames")
                 break
 
-            results = yolo.detect(frame)
+            results = self.yolo.detect(frame)
             if self.mode == 1 :
                 try : 
                     if(len(results)==0) : 
@@ -135,7 +136,7 @@ class AiWorker(QObject) :
                             # Get embedding and save it
                             face_crop = frame[max(0, y1-10):min(frame.shape[0], y2+10), 
                                             max(0, x1-10):min(frame.shape[1], x2+10)]
-                            emb = embedder.get_embedding(face_crop)
+                            emb = self.embedder.get_embedding(face_crop)
                             self.collected_embeddings.append(emb)
                             
                             self.registration_status.emit(f"Captured {len(self.collected_embeddings)}/5")
@@ -167,10 +168,10 @@ class AiWorker(QObject) :
                     if face_crop.size == 0:
                         continue
 
-                    emb = embedder.get_embedding(face_crop)
+                    emb = self.embedder.get_embedding(face_crop)
 
                     if emb is not None : 
-                        name = self.recognize_face(emb, self.db, threshold=0.8)
+                        name = self.recognize_face(emb, self.db, threshold=0.7)
                     else : name = "unknown"
                     color = (0,255,0) if name != "unknown" else (0,0,255)
                     cv2.rectangle(frame, (x1,y1), (x2,y2), color, 2)
