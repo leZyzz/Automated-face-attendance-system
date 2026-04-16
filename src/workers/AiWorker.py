@@ -5,6 +5,7 @@ from PySide6.QtGui import QImage
 from ai_models.ArcFaceOnnx import ArcFaceEmbedderOnnx
 from ai_models.FaceNetOnnx import FaceNetEmbedderOnnx
 from ai_models.YoloOnnx import YoloOnnx
+from ai_models.InsightOnnx import ScrfdOnnx
 
    
    
@@ -18,7 +19,7 @@ class AiWorker(QObject) :
     def __init__(self,db) : 
         
         super().__init__()
-        self.yolo = YoloOnnx()
+        self.detector = ScrfdOnnx()
         self.embedder = FaceNetEmbedderOnnx()
         self.db = db
         self.active = True
@@ -46,8 +47,7 @@ class AiWorker(QObject) :
         return True , "hold still...."
   
 
-    def cos_sim(self,a,b):
-            return np.dot(a,b) / (np.linalg.norm(a) * np.linalg.norm(b))
+    
 
     def recognize_face(self,emb, database, threshold=0.8):
         """
@@ -119,18 +119,19 @@ class AiWorker(QObject) :
                 self.status_update.emit("Failed to get frames")
                 break
 
-            results = self.yolo.detect(frame)
+            boxes, kps = self.detector.detect(frame)
+            
             if self.mode == 1 :
                 try : 
-                    if(len(results)==0) : 
+                    if(len(boxes)==0) : 
                         self.registration_status.emit("No face detected ")
-                    elif(len(results)>1) :
+                    elif(len(boxes)>1) :
                         self.registration_status.emit("Multiple faces detected ")
                     else : 
-                        is_good , message = self.check_quality(results,frame.shape)
+                        is_good , message = self.check_quality(boxes,frame.shape)
                         self.registration_status.emit(message)
                         if is_good : 
-                            x1, y1, x2, y2 = results[0]
+                            x1, y1, x2, y2 = boxes[0]
                             cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
                             
                             # Get embedding and save it
@@ -160,7 +161,7 @@ class AiWorker(QObject) :
                     self.mode = 0 
 
             elif self.mode == 0 :
-                for box in results:
+                for box in boxes:
                     x1, y1, x2, y2 = box
                     h,w,_=frame.shape
                     face_crop = frame[max(0,y1-10):min(h,y2+10), max(0,x1-10):min(w,x2+10)]
@@ -171,7 +172,7 @@ class AiWorker(QObject) :
                     emb = self.embedder.get_embedding(face_crop)
 
                     if emb is not None : 
-                        name = self.recognize_face(emb, self.db, threshold=0.7)
+                        name = self.recognize_face(emb, self.db, threshold=0.65)
                     else : name = "unknown"
                     color = (0,255,0) if name != "unknown" else (0,0,255)
                     cv2.rectangle(frame, (x1,y1), (x2,y2), color, 2)
