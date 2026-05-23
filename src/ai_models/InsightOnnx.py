@@ -1,13 +1,21 @@
 import cv2
 import numpy as np
 import onnxruntime as ort 
+from pathlib import Path 
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+MODELS_DIR = BASE_DIR / "assets" / "models"
+SCRFD_PATH = MODELS_DIR / "det_500m.onnx"
 
 
-MODEL_PATH = "/home/zyzz/py/myenv/assets/models/det_500m.onnx"  
+ 
 
 class ScrfdOnnx:
-    def __init__(self, model_path="/home/zyzz/py/myenv/assets/models/det_500m.onnx"):
-        self.session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+    def __init__(self, model_path=SCRFD_PATH):
+        if not model_path.exists() :
+            raise FileNotFoundError(f"Missing model file at  {model_path}")
+        
+        self.session = ort.InferenceSession(str(model_path),providers=["CUDAExecutionProvider","CPUExecutionProvider"])
         self.input_name = self.session.get_inputs()[0].name
         self.feat_strides = [8, 16, 32]
         self.num_anchors = 2

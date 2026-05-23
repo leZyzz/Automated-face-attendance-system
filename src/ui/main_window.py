@@ -9,9 +9,19 @@ from PySide6.QtCore import QThread, Signal, Qt , Slot
 from PySide6.QtGui import QPixmap
 from workers.AiWorker import AiWorker
 from databaseSection.database_window import database_window
-from torch import device ,cuda
 from util.utilFuncs import load_data
-DEVICE = device("cuda" if cuda.is_available() else "cpu")
+import onnxruntime as ort
+from pathlib import Path 
+
+
+
+DEVICE = "CUDA" if "CUDAExecutionProvider" in ort.get_available_providers() else "CPU"
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+DB_PATH = BASE_DIR / "db" / "face_db1.json"
+STYLES_DIR = BASE_DIR / "assets" / "styles"
+DARK_MODE_PATH = STYLES_DIR / "dark_style.qss"
+LIGHT_MODE_PATH = STYLES_DIR / "light_style.qss"
+
 class MainWindow(QMainWindow) :
     start_camera_sig = Signal()
     def __init__(self) : 
@@ -20,7 +30,7 @@ class MainWindow(QMainWindow) :
         self.setMinimumSize(1024,800)
         self.init_ui()
         self.worker = None
-        self.db = load_data("/home/zyzz/py/myenv/data/db_file1.json")
+        self.db = load_data(DB_PATH)
         
         
  
@@ -78,8 +88,8 @@ class MainWindow(QMainWindow) :
         self.setCentralWidget(self.main_widget)
         self.main_layout = QHBoxLayout(self.main_widget)
         
-        self.dark_theme = self.load_stylesheet("/home/zyzz/py/myenv/assets/styles/dark_style.qss")
-        self.light_theme = self.load_stylesheet("/home/zyzz/py/myenv/assets/styles/light_style.qss")
+        self.dark_theme = self.load_stylesheet(DARK_MODE_PATH)
+        self.light_theme = self.load_stylesheet(LIGHT_MODE_PATH)
         self.current_theme = "dark_theme"
         
         # ---LIVE FEED SIDE---

@@ -8,4 +8,5 @@ dependencies = [
    "onnxruntime>=1.26.0",
    "opencv-python>=4.13.0.92",
    "pyside6>=6.11.1",
+   "torch>=2.12.0",
 ]

@@ -2,12 +2,11 @@ import numpy as np
 import cv2
 from PySide6.QtCore import Signal,  Slot , QObject
 from PySide6.QtGui import QImage
-from ai_models.ArcFaceOnnx import ArcFaceEmbedderOnnx
 from ai_models.FaceNetOnnx import FaceNetEmbedderOnnx
-from ai_models.YoloOnnx import YoloOnnx
 from ai_models.InsightOnnx import ScrfdOnnx
+import time
 
-   
+
    
 
 
@@ -111,73 +110,91 @@ class AiWorker(QObject) :
     def start_camera_loop(self):
       
         cap = cv2.VideoCapture(0)
-    
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        prev_time = 0
+        frame_count = 0 
+        inference_every = 3 
+        last_boxes , last_names = [] , []
         while self.active:
             success, frame = cap.read()
 
             if not success:
                 self.status_update.emit("Failed to get frames")
                 break
-
-            boxes, kps = self.detector.detect(frame)
-            
-            if self.mode == 1 :
-                try : 
-                    if(len(boxes)==0) : 
-                        self.registration_status.emit("No face detected ")
-                    elif(len(boxes)>1) :
-                        self.registration_status.emit("Multiple faces detected ")
-                    else : 
-                        is_good , message = self.check_quality(boxes,frame.shape)
-                        self.registration_status.emit(message)
-                        if is_good : 
-                            x1, y1, x2, y2 = boxes[0]
-                            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
-                            
-                            # Get embedding and save it
-                            face_crop = frame[max(0, y1-10):min(frame.shape[0], y2+10), 
-                                            max(0, x1-10):min(frame.shape[1], x2+10)]
-                            emb = self.embedder.get_embedding(face_crop)
-                            self.collected_embeddings.append(emb)
-                            
-                            self.registration_status.emit(f"Captured {len(self.collected_embeddings)}/5")
-                            
-                            # Once we have 5, finish the registration!
-                            if len(self.collected_embeddings) == 5:
-                                # Calculate the mathematical average
-                        
-                                master_embedding = np.mean(self.collected_embeddings, axis=0)
+            frame_count +=1 
+            current_time = time.time()
+            fps = 1 /(current_time - prev_time)
+            prev_time = current_time
+            if frame_count % inference_every == 0 : 
+                boxes, kps = self.detector.detect(frame)
+                """""
+                if self.mode == 1 :
+                    try : 
+                        if(len(boxes)==0) : 
+                            self.registration_status.emit("No face detected ")
+                        elif(len(boxes)>1) :
+                            self.registration_status.emit("Multiple faces detected ")
+                        else : 
+                            is_good , message = self.check_quality(boxes,frame.shape)
+                            self.registration_status.emit(message)
+                            if is_good : 
+                                x1, y1, x2, y2 = boxes[0]
+                                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
                                 
-                                # Save to your DB dictionary
-                                self.db[self.person_name] = master_embedding.tolist()
+                                # Get embedding and save it
+                                face_crop = frame[max(0, y1-10):min(frame.shape[0], y2+10), 
+                                                max(0, x1-10):min(frame.shape[1], x2+10)]
+                                emb = self.embedder.get_embedding(face_crop)
+                                self.collected_embeddings.append(emb)
                                 
-                                self.registration_status.emit("Registration Complete!")
-                                self.mode = 0
+                                self.registration_status.emit(f"Captured {len(self.collected_embeddings)}/5")
                                 
-                            self.frame_ready.emit(self.cvt2Qimage(frame))
-                except Exception as e :
+                                # Once we have 5, finish the registration!
+                                if len(self.collected_embeddings) == 5:
+                                    # Calculate the mathematical average
+                            
+                                    master_embedding = np.mean(self.collected_embeddings, axis=0)
+                                    
+                                    # Save to your DB dictionary
+                                    self.db[self.person_name] = master_embedding.tolist()
+                                    
+                                    self.registration_status.emit("Registration Complete!")
+                                    self.mode = 0
+                                    
+                                self.frame_ready.emit(self.cvt2Qimage(frame))
+                    except Exception as e :
 
-                    print(f"failed due to {e}")
-                    self.mode = 0 
+                        print(f"failed due to {e}")
+                        self.mode = 0 
+                """""
+                if self.mode == 0 :
+                    names = []
+                    for box in boxes:
+                        x1, y1, x2, y2 = box
+                        h,w,_=frame.shape
+                        face_crop = frame[max(0,y1-10):min(h,y2+10), max(0,x1-10):min(w,x2+10)]
 
-            elif self.mode == 0 :
-                for box in boxes:
+                        if face_crop.size == 0:
+                            names.append("unknown")
+                            continue
+
+                        emb = self.embedder.get_embedding(face_crop)
+
+                        if emb is not None : 
+                            name = self.recognize_face(emb, self.db, threshold=0.65)
+                        else : name = "unknown"
+                        names.append(name)
+                    last_boxes,last_names = boxes,names
+            for box , name in zip(last_boxes,last_names) : 
                     x1, y1, x2, y2 = box
-                    h,w,_=frame.shape
-                    face_crop = frame[max(0,y1-10):min(h,y2+10), max(0,x1-10):min(w,x2+10)]
-
-                    if face_crop.size == 0:
-                        continue
-
-                    emb = self.embedder.get_embedding(face_crop)
-
-                    if emb is not None : 
-                        name = self.recognize_face(emb, self.db, threshold=0.65)
-                    else : name = "unknown"
                     color = (0,255,0) if name != "unknown" else (0,0,255)
                     cv2.rectangle(frame, (x1,y1), (x2,y2), color, 2)
                     cv2.putText(frame, name, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-                self.frame_ready.emit(self.cvt2Qimage(frame))
+                    
+            cv2.putText(frame,f"{int(fps)} FPS",(10,30),cv2.FONT_HERSHEY_SIMPLEX,1.0, (0,255,0),2)
+
+            self.frame_ready.emit(self.cvt2Qimage(frame))
         cap.release()
     @Slot()                
     def stop(self) : 

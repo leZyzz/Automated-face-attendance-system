@@ -2,9 +2,10 @@ import cv2
 import numpy as np 
 import onnxruntime as ort
 
+Model_path = "C:/Users/chiko/access_sys/AMS/assets/models/arcface.onnx"
 
 class ArcFaceEmbedderOnnx() :
-    def __init__(self,model_path="/home/zyzz/py/myenv/assets/models/arcface.onnx") :
+    def __init__(self,model_path=Model_path) :
         
         providers=["CPUExecutionProvider"]
 

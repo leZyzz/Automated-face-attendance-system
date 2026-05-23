@@ -2,13 +2,20 @@
 import cv2 
 import numpy as np 
 import onnxruntime as ort
+from pathlib import Path 
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+MODELS_DIR = BASE_DIR / "assets" / "models"
+FACENET_PATH = MODELS_DIR / "facenet.onnx"
 
 
 class FaceNetEmbedderOnnx() :
-    def __init__(self,model_path="/home/zyzz/py/myenv/assets/models/facenet.onnx") :
+    def __init__(self,model_path=FACENET_PATH) :
         
-        providers=["CPUExecutionProvider"]
-
+        providers=["CUDAExecutionProvider","CPUExecutionProvider"]
+        if not model_path.exists() : 
+            raise FileNotFoundError(f"Missing model file at {model_path}")
+        
         self.session = ort.InferenceSession(model_path,providers=providers)
 
     def preprocess(self,face_crop) :
