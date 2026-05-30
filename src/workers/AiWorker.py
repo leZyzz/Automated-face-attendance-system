@@ -5,7 +5,7 @@ from PySide6.QtGui import QImage
 from ai_models.FaceNetOnnx import FaceNetEmbedderOnnx
 from ai_models.InsightOnnx import ScrfdOnnx
 import time
-
+from databaseSection.DatabaseManager import DatabaseManager
 
    
 
@@ -15,39 +15,34 @@ class AiWorker(QObject) :
     status_update = Signal(str)
     registration_status= Signal(str)
     
-    def __init__(self,db) : 
+    def __init__(self,db:DatabaseManager) : 
         
         super().__init__()
         self.detector = ScrfdOnnx()
         self.embedder = FaceNetEmbedderOnnx()
         self.db = db
+        self.student_dict = self.rearrange_db(self.db.students_embeddings)
         self.active = True
-        self.mode = 0 #attendance 
-    def start_registration(self,name) : 
-
-        self.mode = 1 #registration
-        self.person_name = name 
-        self.collected_embeddings = []
-        self.registration_status.emit("please look straight at the camera")
-    def check_quality(self,box,frame_shape) : 
-        x1,y1,x2,y2 = box[0]
-        h , w ,_=frame_shape
-
-        box_width = x2-x1
-        box_height=y2-y1
-
-        # RULE 1 : must be big enough 
-        if box_width<120 or box_height<120 : 
-            return False,"move closer to the camera"
-        #RULE 2 : Must be roughly centered 
-        cx = x1 - (box_width/2)
-        if cx < (w*0.2) or cx>(w*0.8) : 
-             return False,"center your face"
-        return True , "hold still...."
-  
-
+         
     
+    
+    
+    def rearrange_db(self,students_embs:list[tuple[str]])  : 
+         result: dict[str, list[np.ndarray]] = {}
+         for name,lastname,blob in students_embs :
+              key = f"{name} {lastname}" 
+              if key not in result : 
+                   result[key] = []
+                
+              embedding = np.frombuffer(blob,dtype=np.float32)
+              result[key].append(embedding)
 
+         return result 
+
+
+              
+               
+         
     def recognize_face(self,emb, database, threshold=0.8):
         """
         Compares the query embedding (emb) against all stored embeddings 
@@ -65,14 +60,14 @@ class AiWorker(QObject) :
         best_score, best_name = threshold, "unknown" 
 
         # We still loop over names, but the comparison for each name is vectorized
-        for name, info in database.items():
-            if not info['embeddings'] :
+        for name, embeddings in database.items():
+            if not embeddings:
                 continue
                 
             # 2. Prepare the Database Matrix (D)
             # Stack all embeddings for the current person into a single matrix.
             # Shape becomes (N, 512), where N is the number of samples for that person.
-            embeddings_matrix = np.array(info["embeddings"])
+            embeddings_matrix = np.array(embeddings)
             
             # 3. Calculate Dot Products (Numerator: q * D^T)
             # np.dot(1x512, 512xN) -> result is 1xN array of dot products
@@ -128,49 +123,9 @@ class AiWorker(QObject) :
             prev_time = current_time
             if frame_count % inference_every == 0 : 
                 boxes, kps = self.detector.detect(frame)
-                """""
-                if self.mode == 1 :
-                    try : 
-                        if(len(boxes)==0) : 
-                            self.registration_status.emit("No face detected ")
-                        elif(len(boxes)>1) :
-                            self.registration_status.emit("Multiple faces detected ")
-                        else : 
-                            is_good , message = self.check_quality(boxes,frame.shape)
-                            self.registration_status.emit(message)
-                            if is_good : 
-                                x1, y1, x2, y2 = boxes[0]
-                                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
-                                
-                                # Get embedding and save it
-                                face_crop = frame[max(0, y1-10):min(frame.shape[0], y2+10), 
-                                                max(0, x1-10):min(frame.shape[1], x2+10)]
-                                emb = self.embedder.get_embedding(face_crop)
-                                self.collected_embeddings.append(emb)
-                                
-                                self.registration_status.emit(f"Captured {len(self.collected_embeddings)}/5")
-                                
-                                # Once we have 5, finish the registration!
-                                if len(self.collected_embeddings) == 5:
-                                    # Calculate the mathematical average
-                            
-                                    master_embedding = np.mean(self.collected_embeddings, axis=0)
-                                    
-                                    # Save to your DB dictionary
-                                    self.db[self.person_name] = master_embedding.tolist()
-                                    
-                                    self.registration_status.emit("Registration Complete!")
-                                    self.mode = 0
-                                    
-                                self.frame_ready.emit(self.cvt2Qimage(frame))
-                    except Exception as e :
-
-                        print(f"failed due to {e}")
-                        self.mode = 0 
-                """""
-                if self.mode == 0 :
-                    names = []
-                    for box in boxes:
+          
+                names = []
+                for box in boxes:
                         x1, y1, x2, y2 = box
                         h,w,_=frame.shape
                         face_crop = frame[max(0,y1-10):min(h,y2+10), max(0,x1-10):min(w,x2+10)]
@@ -182,10 +137,10 @@ class AiWorker(QObject) :
                         emb = self.embedder.get_embedding(face_crop)
 
                         if emb is not None : 
-                            name = self.recognize_face(emb, self.db, threshold=0.65)
+                            name = self.recognize_face(emb, self.student_dict, threshold=0.65)
                         else : name = "unknown"
                         names.append(name)
-                    last_boxes,last_names = boxes,names
+                last_boxes,last_names = boxes,names
             for box , name in zip(last_boxes,last_names) : 
                     x1, y1, x2, y2 = box
                     color = (0,255,0) if name != "unknown" else (0,0,255)

@@ -6,19 +6,34 @@ from PySide6.QtCore import QObject , Signal , Slot
 
 
 class DatabaseManager(QObject) : 
+
     students_changed = Signal()
     history_changed  = Signal()
     def __init__(self,db_path:str) : 
         super().__init__()
+      
         self.db = sqlite3.connect(db_path)
         self.students =self.db.execute("select * from students").fetchall()
-        self.students_changed.connect(self.refetch_all_students)
         self.history_logs = self.db.execute("""select student_id,log_day,log_time,event_type,confidence,alert_type
                                                 from access_logs""").fetchall()
-      
-        self.history_changed.connect(self.refetch_history_logs)
+        
+        self.students_embeddings = self.db.execute("""select name,lastname , vector 
+                                                      from students 
+                                                      join embeddings 
+                                                      on students.id = student_id  """).fetchall()
+        
+        
         self.DB_PASS = "hardpassword"
+
+
+
+        self.students_changed.connect(self.refetch_all_students)
+        self.history_changed.connect(self.refetch_history_logs)
    
+
+
+
+
     def refetch_all_students(self) ->list[tuple[str]] : 
         self.students=self.db.execute("select * from students").fetchall()
 
