@@ -1,0 +1,68 @@
+    QMainWindow, QWidget {
+        background-color: #f0f0f0; /* Standard Window Grey */
+        color: #333333;
+        font-family: 'Segoe UI', sans-serif;
+        font-size: 13px;
+        border: none;
+    }
+
+    Qdialog {
+         background-color: #f0f0f0; /* Standard Window Grey */
+        color: #333333;
+        font-family: 'Segoe UI', sans-serif;
+        font-size: 13px;
+        border: none;
+    }
+
+    /* 2. Feed Label */
+    QLabel#cmdcenter {
+        font-weight: bold;
+        color: #333333;
+    }
+    QLabel#feed_label {
+        background-color: #ffffff;
+        border: 1px solid #c0c0c0;
+        border-radius: 4px;
+    }
+
+    /* 3. GroupBox - Title Intercept Fix */
+    QGroupBox {
+        border: 1px solid #c0c0c0;
+        border-radius: 4px;
+        margin-top: 10px;
+        padding-top: 10px;
+    }
+    QGroupBox::title {
+        subcontrol-origin: margin;
+        subcontrol-position: top left;
+        left: 8px;
+        padding: 0 3px;
+        background-color: #f0f0f0; /* MATCHES GLOBAL BACKGROUND */
+        font-weight: bold;
+    }
+
+    /* 4. Buttons - Standard Size */
+    QPushButton {
+        background-color: #ffffff;
+        border: 1px solid #c0c0c0;
+        color: #333333;
+        border-radius: 3px;
+        min-height: 28px; /* Fixed height */
+        padding: 0 10px;
+    }
+    QPushButton:hover {
+        background-color: #e6e6e6;
+        border-color: #adadad;
+    }
+    QPushButton:pressed {
+        background-color: #cce8ff; /* Subtle blue tint */
+        border-color: #99d1ff;
+    }
+    QLabel#buildlabel {
+         font-weight: bold;
+         color: #333333;
+    }
+    /* 5. Sidebar Frame */
+    QFrame {
+        background-color: transparent;
+    }

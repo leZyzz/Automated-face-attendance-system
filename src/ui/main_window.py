@@ -8,7 +8,8 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PySide6.QtCore import QThread, Signal, Qt , Slot 
 from PySide6.QtGui import QPixmap
 from workers.AiWorker import AiWorker
-from databaseSection.database_window import database_window
+from databaseSection.dbwindow import DatabaseWindow
+from databaseSection.DatabaseManager import DatabaseManager
 from util.utilFuncs import load_data
 import onnxruntime as ort
 from pathlib import Path 
@@ -17,7 +18,7 @@ from pathlib import Path
 
 DEVICE = "CUDA" if "CUDAExecutionProvider" in ort.get_available_providers() else "CPU"
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-DB_PATH = BASE_DIR / "db" / "face_db1.json"
+DB_PATH = BASE_DIR / "db" / "database.db"
 STYLES_DIR = BASE_DIR / "assets" / "styles"
 DARK_MODE_PATH = STYLES_DIR / "dark_style.qss"
 LIGHT_MODE_PATH = STYLES_DIR / "light_style.qss"
@@ -30,7 +31,8 @@ class MainWindow(QMainWindow) :
         self.setMinimumSize(1024,800)
         self.init_ui()
         self.worker = None
-        self.db = load_data(DB_PATH)
+        self.db = DatabaseManager(DB_PATH)
+        self.dbwindow = None
         
         
  
@@ -132,26 +134,18 @@ class MainWindow(QMainWindow) :
     
         self.db_ctrl= QGroupBox("Database Management")
         self.db_ctrl_lt = QVBoxLayout(self.db_ctrl)
-        self.db_view_btn = QPushButton("View database")
-        self.db_ctrl_lt.addWidget(self.db_view_btn)
-        self.db_add_btn = QPushButton("Add Person")
-        self.db_add_btn.clicked.connect(self.add_person)
-        self.db_ctrl_lt.addWidget(self.db_add_btn)
-        self.db_import_btn = QPushButton("Import folder")
-        self.db_ctrl_lt.addWidget(self.db_import_btn)
-  
+        self.db_manager_btn = QPushButton("Open database manager")
+        self.db_ctrl_lt.addWidget(self.db_manager_btn)
+       
+       
         self.side_bar_lt.addWidget(self.db_ctrl)
 
 
 
         self.Attendace_ctrl = QGroupBox("Attendance Control")
         self.Attendace_ctrl_lt = QVBoxLayout(self.Attendace_ctrl)
-        self.view_list_btn = QPushButton("View Authorized Persons")
-        self.Attendace_ctrl_lt.addWidget(self.view_list_btn)
-
-        self.upload_list_btn = QPushButton("Upload List")
-        self.Attendace_ctrl_lt.addWidget(self.upload_list_btn)
-
+        self.session_stats_btn = QPushButton("Session stats")
+        self.Attendace_ctrl_lt.addWidget(self.session_stats_btn)
 
         self.side_bar_lt.addWidget(self.Attendace_ctrl)
         self.side_bar_lt.addStretch()
@@ -171,8 +165,9 @@ class MainWindow(QMainWindow) :
         
         
         self.init_sys_btn.clicked.connect(self.boot_shut_sys)
-        self.db_view_btn.clicked.connect(self.view_databse)
-        self.db_import_btn.clicked.connect(self.import_folder)
+        self.db_manager_btn.clicked.connect(self.view_databse)
+       
+
     def load_stylesheet(self,filename) : 
         try : 
             with open(filename,"r") as f : 
@@ -215,39 +210,17 @@ class MainWindow(QMainWindow) :
                 self.Thread.wait()
         event.accept()
     
-    def add_person(self) : 
-        name , ok_pressed = QInputDialog.getText(self,"New regisrtation","Enter name : ")
-        if ok_pressed : 
-            clean_name = name.strip()
-            if clean_name!="" : 
-                self.worker.start_registration(clean_name)
-            else : 
-                QMessageBox.warning(self,"Invalid input" , "Name cannot be empty")
+   
 
-    @Slot(dict)
-    def update_db(self,db) : 
-        self.db=db 
+   
     def view_databse(self) : 
-        db_windown = database_window(self.db)
-        old_state = self.init_sys_btn.isChecked() 
-        if  old_state :
-            self.init_sys_btn.setChecked(False)
-            self.boot_shut_sys()
-        db_windown.db_changed.connect(self.update_db)
-        db_windown.exec()
-        if old_state :
-            self.init_sys_btn.setChecked(True)
-            self.boot_shut_sys()
-    def import_folder(self): 
-        response = QFileDialog.getExistingDirectoryUrl(
-            parent=self,
-            caption='Select Folder',
-            dir=os.getcwd(),
-        )
-        QMessageBox.information(self,"response",response.toString()) 
-        response = QFileDialog.getExistingDirectoryUrl(
-            parent=self,
-            caption='Select Folder',
-            dir=os.getcwd(),
-        )
-        QMessageBox.information(self,"response",response.toString())
+        if self.dbwindow is None : 
+            self.dbwindow =DatabaseWindow(self.db)
+            self.dbwindow.destroyed.connect(lambda: setattr(self, "dbwindow", None)  )
+        if self.dbwindow.isMinimized():
+            self.dbwindow.setWindowState(self.dbwindow.windowState() & ~Qt.WindowMinimized)
+        self.dbwindow.show()
+        self.dbwindow.raise_()
+        self.dbwindow.activateWindow()
+
+   
